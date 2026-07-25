@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>chord2tab — L0 / L0.5 / L1 explorer</title>
+    <title>chord2tab — L0 / L0.5 / L1 / L2 explorer</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -66,6 +66,8 @@
       th { color: var(--muted); font-weight: 600; }
       .err { color: #d33; font-family: var(--mono); white-space: pre-wrap; }
       .pc { color: var(--accent); }
+      pre.tab { font-family: var(--mono); font-size: 13px; line-height: 1.4; margin: 0; padding: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+      select { font-family: var(--mono); font-size: 14px; padding: 0.15rem 0.4rem; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; }
       footer { margin-top: 3rem; color: var(--muted); font-size: 13px; }
       a { color: var(--accent); }
       code { font-family: var(--mono); background: var(--card); padding: 0 0.25rem; border-radius: 4px; }
@@ -75,9 +77,10 @@
     <div class="wrap">
       <h1>chord2tab</h1>
       <p class="sub">
-        rechord-compatible chord text → rational time model (L0), guitar chord slot
-        analysis (L0.5), and a Viterbi voicing solver (L1). From
-        <code>SPEC.md</code>; the tab layer (L2) and audio come later.
+        rechord-compatible chord text → rational time model (L0), chord slot
+        analysis (L0.5), a voicing solver + idiomatic library (L1), and ASCII
+        tab from fingerpicking patterns (L2). From <code>SPEC.md</code>; audio
+        (Karplus-Strong) comes later.
       </p>
 
       <textarea id="input" spellcheck="false">Am F C G | Dm7(b5) Csus2dim | Fm/Ab | % | A==G</textarea>

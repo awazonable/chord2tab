@@ -3,6 +3,8 @@ import { parse, ParseError } from "./l0/parse.js";
 import { parseChord, pitchClasses, DEGREES, type Chord } from "./l0_5/chord.js";
 import { solve } from "./l1/solver.js";
 import { renderVoicing } from "./l1/format.js";
+import { buildTab, renderTab } from "./l2/tab.js";
+import { PATTERNS } from "./l2/patterns.js";
 
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -21,6 +23,8 @@ const EXAMPLES = [
 const input = document.getElementById("input") as HTMLTextAreaElement;
 const output = document.getElementById("output") as HTMLDivElement;
 const examples = document.getElementById("examples") as HTMLDivElement;
+
+let currentPattern = "travis";
 
 function esc(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);
@@ -108,6 +112,14 @@ function render() {
     if (result.warnings.length) {
       html += `<div class="err">${result.warnings.map(esc).join("\n")}</div>`;
     }
+
+    // ---- L2: ASCII tab ----
+    const opts = Object.keys(PATTERNS)
+      .map((p) => `<option value="${p}"${p === currentPattern ? " selected" : ""}>${p}</option>`)
+      .join("");
+    const tab = buildTab(result, { pattern: currentPattern });
+    html += `<h2>L2 — tab &nbsp;<select id="pattern">${opts}</select></h2>`;
+    html += `<div class="scroll"><pre class="tab">${esc(renderTab(tab))}</pre></div>`;
   } catch (e) {
     const label = e instanceof ParseError ? "Parse error" : "Error";
     html = `<h2>${label}</h2><div class="err">${esc((e as Error).message)}</div>`;
@@ -124,6 +136,15 @@ for (const ex of EXAMPLES) {
   };
   examples.appendChild(b);
 }
+
+// The pattern <select> is re-rendered each time, so delegate its change event.
+output.addEventListener("change", (e) => {
+  const t = e.target as HTMLElement;
+  if (t.id === "pattern") {
+    currentPattern = (t as HTMLSelectElement).value;
+    render();
+  }
+});
 
 input.addEventListener("input", render);
 render();

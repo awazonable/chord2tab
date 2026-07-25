@@ -12,13 +12,18 @@ Implemented so far:
   open + movable CAGED shapes that override the solver when a standard shape
   exists (`src/l1/library.ts`)
 
-Tab rendering (L2) and Karplus-Strong audio (§6) are not implemented yet.
+- **L2** — tab rendering: an independent role-based fingerpicking pattern track
+  scanned over the L1 voicing track, with grid-collision quantization, rest /
+  string-transition damps, and ASCII tab output (SPEC §5)
+
+Karplus-Strong audio (§6) is not implemented yet.
 
 ## Live demo
 
 An interactive L0/L0.5/L1 explorer is deployed to GitHub Pages. Type a
 progression and see the exact-rational event timeline, the pitch-class analysis
-of each chord, and the solved guitar voicings (with alternatives). Building it
+of each chord, the solved guitar voicings (with alternatives), and the ASCII
+tab for a selectable fingerpicking pattern. Building it
 (`npm run build`) also runs the tests, and pushes to `main` auto-deploy via
 `.github/workflows/deploy-pages.yml`.
 
@@ -32,8 +37,9 @@ npm test          # runs the mandatory SPEC §2.5 and §3.4 test tables
 npm run typecheck
 npm run dev        # local demo at http://localhost:5173
 npm run build      # typecheck + tests + static build into dist/
-npm run cli -- "C Am F G | Dm7(b5) | Fm/Ab"   # L0 + L0.5 + solved L1 tab
-npm run cli -- --alts "Cmaj7 | Am7"           # also show k-best voicings
+npm run cli -- "C Am F G | Dm7(b5) | Fm/Ab"        # L0 + L0.5 + L1 + L2 tab
+npm run cli -- --alts "Cmaj7 | Am7"                # also show k-best voicings
+npm run cli -- --pattern arp-up "C G Am | F"       # pick a fingerpicking pattern
 ```
 
 ## Design notes
@@ -95,7 +101,23 @@ src/l1/library.ts    L1: curated idiomatic shapes (open + movable CAGED barres)
 src/l1/voicing.ts    L1: note selection, candidate enumeration, filters, single cost
 src/l1/solver.ts     L1: library-first lookup + transition cost + Viterbi DP + k-best
 src/l1/format.ts     L1: §4.7 text form
+src/l2/patterns.ts   L2: role-based fingerpicking patterns (travis, arp, block)
+src/l2/tab.ts        L2: pattern×voicing expander + quantization/damps + ASCII tab
 src/cli.ts           terminal inspector
 src/demo.ts          GitHub Pages explorer
-tests/               SPEC §2.5 / §3.4 tables + L1 playability invariants
+tests/               SPEC §2.5 / §3.4 tables + L1/L2 invariants
 ```
+
+L2 design notes:
+
+- **Two independent tracks** (§5.1). The pattern is a continuous grid that runs
+  across bars and never restarts on a chord change; each pluck looks up whatever
+  voicing is active at that instant.
+- **Roles, not string numbers** (§5.2). `B`/`B*`/`m1`/`m2`/`T` resolve against
+  the *current* voicing's ringing strings, so a pattern works regardless of how
+  many strings a chord uses.
+- **Quantize, don't subdivide** (§5.3). Off-grid chord changes (e.g. 3 chords in
+  a 1/8-grid bar) snap to the nearest pluck and emit a shift warning; we never
+  take an LCM.
+- **Guitar ≠ keyboard** (§5.4–§5.6). Rests and sounding→muted transitions emit
+  explicit damps (`X`); other strings ring until their next event.

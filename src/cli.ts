@@ -10,6 +10,8 @@ import { parse } from "./l0/parse.js";
 import { parseChord, pitchClasses, DEGREES, type Chord } from "./l0_5/chord.js";
 import { solve } from "./l1/solver.js";
 import { formatL1, renderVoicing } from "./l1/format.js";
+import { buildTab, renderTab } from "./l2/tab.js";
+import { PATTERNS } from "./l2/patterns.js";
 
 function readStdin(): Promise<string> {
   return new Promise((resolve) => {
@@ -32,9 +34,14 @@ function describeChord(c: Chord): string {
 async function main() {
   const args = process.argv.slice(2);
   const showAlts = args.includes("--alts");
-  const input = (args.filter((a) => a !== "--alts").join(" ").trim() || (await readStdin()).trim());
+  const pIdx = args.indexOf("--pattern");
+  const patternName = pIdx >= 0 ? args[pIdx + 1] : "travis";
+  const rest = args.filter((a, i) => a !== "--alts" && a !== "--pattern" && i !== pIdx + 1);
+  const input = (rest.join(" ").trim() || (await readStdin()).trim());
   if (!input) {
-    console.error('usage: cli [--alts] "C Am F G | Dm7(b5) | Fm/Ab"');
+    console.error(
+      `usage: cli [--alts] [--pattern <${Object.keys(PATTERNS).join("|")}>] "C Am F G | Dm7(b5) | Fm/Ab"`,
+    );
     process.exit(1);
   }
 
@@ -70,6 +77,9 @@ async function main() {
       console.log(`${node.token.padEnd(12)} ${alts.join("   ")}`);
     }
   }
+
+  console.log(`\n== L2 (pattern: ${patternName}) ==`);
+  console.log(renderTab(buildTab(result, { pattern: patternName })));
 }
 
 main();
