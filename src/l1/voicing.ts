@@ -247,6 +247,8 @@ export interface Candidate {
   voicing: Voicing;
   info: VoicingInfo;
   cost: number;
+  /** Where this candidate came from (set by the solver's candidatesFor). */
+  origin?: "library" | "solver";
 }
 
 /**

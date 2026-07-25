@@ -12,6 +12,7 @@
         --muted: #6a6a6a;
         --border: #e2e2e2;
         --accent: #b5651d;
+        --pin: #1f8a70;
         --card: #fafafa;
         --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
       }
@@ -22,6 +23,7 @@
           --muted: #9a9a90;
           --border: #33332c;
           --accent: #e0a35e;
+          --pin: #4fd1a5;
           --card: #1d1d16;
         }
       }
@@ -73,9 +75,15 @@
       .controls button#stop { background: var(--card); color: var(--fg); border-color: var(--border); }
       .controls label { color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
       .alt { display: inline-block; font-family: var(--mono); font-size: 12px; padding: 0.1rem 0.4rem; margin: 0.1rem; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--fg); }
-      .alt:hover { border-color: var(--accent); color: var(--accent); }
-      .alt.active { border-color: var(--accent); background: var(--accent); color: #fff; }
-      .alt.reset { border-style: dashed; opacity: 0.8; }
+      .alt.lib { color: var(--accent); }         /* library alternatives (subtle) */
+      .alt.solv { color: var(--muted); }         /* solver alternatives */
+      .alt:hover { border-color: var(--fg); }
+      .alt.active { background: var(--muted); border-color: var(--muted); color: var(--bg); }   /* auto pick */
+      .alt.active.pinned { background: var(--pin); border-color: var(--pin); color: #fff; }      /* user pin */
+      .alt.reset { border-style: dashed; border-color: var(--pin); color: var(--pin); font-weight: 600; }
+      .tag-pin { color: var(--pin); }
+      .tag-lib { color: var(--accent); }
+      .tag-solv { opacity: 0.6; }
       footer { margin-top: 3rem; color: var(--muted); font-size: 13px; }
       a { color: var(--accent); }
       code { font-family: var(--mono); background: var(--card); padding: 0 0.25rem; border-radius: 4px; }

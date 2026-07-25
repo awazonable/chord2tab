@@ -110,9 +110,14 @@ function candidatesFor(
 ): { dp: Candidate[]; alternates: Candidate[]; source: "library" | "solver"; warning?: string } {
   const lib = lookupVoicings(chord);
   const solver = solverCandidates(chord, k);
+  for (const c of solver.cands) c.origin = "solver";
 
   if (lib && lib.length) {
-    const dp = lib.map((v) => toCandidate(v, chord));
+    const dp = lib.map((v) => {
+      const c = toCandidate(v, chord);
+      c.origin = "library";
+      return c;
+    });
     const seen = new Set(dp.map((c) => c.voicing.join(",")));
     const extra = solver.cands.filter((c) => !seen.has(c.voicing.join(",")));
     return { dp, alternates: [...dp, ...extra], source: "library" };
