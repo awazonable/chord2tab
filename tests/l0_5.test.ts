@@ -81,6 +81,12 @@ describe("L0.5 — modifier semantics", () => {
     expect([...pitchClasses(add6)].sort((a, b) => a - b)).toEqual([0, 4, 7, 9]);
   });
 
+  it("parses bare altered tensions without parentheses (m7b5, 7#9)", () => {
+    expect(pcs("Bm7b5")).toEqual(pcs("Bm7(b5)"));
+    expect(pcs("C7#9")).toEqual(pcs("C7(#9)"));
+    expect(pcs("C7b9")).toEqual(pcs("C7(b9)"));
+  });
+
   it("slash bass is parsed but is not part of the slot pitch-class set", () => {
     const c = parseChord("Fm/Ab");
     expect(c.bass_pc).toBe(8); // Ab

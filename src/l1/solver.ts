@@ -8,12 +8,15 @@ import { parseChord, type Chord } from "../l0_5/chord.js";
 import {
   enumerate,
   analyze,
+  singleCost,
+  selectNotes,
   DEFAULT_FILTERS,
   type Candidate,
   type Voicing,
   type VoicingInfo,
   type Filters,
 } from "./voicing.js";
+import { lookupVoicings } from "./library.js";
 
 const TW = {
   centroid: 0.3, // left-hand centroid movement (§4.5)
@@ -60,6 +63,8 @@ export interface NodeResult {
   info: VoicingInfo | null;
   /** Ranked alternatives (k-best single-chord candidates) — for "別解" (§4.6). */
   alternates: Candidate[];
+  /** Where the DP candidates came from. */
+  source: "library" | "solver";
   eventIndices: number[]; // events (in the original list) this node covers
 }
 
@@ -69,8 +74,15 @@ export interface SolveResult {
   warnings: string[];
 }
 
+/** Wrap a raw voicing as a scored Candidate for a given chord. */
+function toCandidate(voicing: Voicing, chord: Chord): Candidate {
+  const info = analyze(voicing);
+  const cost = singleCost(voicing, info, selectNotes(chord));
+  return { voicing, info, cost };
+}
+
 /** Enumerate candidates for a chord, relaxing filters if nothing is playable. */
-function candidatesFor(chord: Chord, k: number): { cands: Candidate[]; warning?: string } {
+function solverCandidates(chord: Chord, k: number): { cands: Candidate[]; warning?: string } {
   let cands = enumerate(chord, k, DEFAULT_FILTERS);
   if (cands.length) return { cands };
 
@@ -85,6 +97,27 @@ function candidatesFor(chord: Chord, k: number): { cands: Candidate[]; warning?:
     if (cands.length) return { cands, warning: `relaxed filters (span≤${f.maxSpan}) to voice this chord` };
   }
   return { cands: [] };
+}
+
+/**
+ * Candidates for one chord. If the library has an idiomatic shape, those become
+ * the DP candidates (the "standard answer" wins); solver candidates are still
+ * appended as alternates. Otherwise the solver drives.
+ */
+function candidatesFor(
+  chord: Chord,
+  k: number,
+): { dp: Candidate[]; alternates: Candidate[]; source: "library" | "solver"; warning?: string } {
+  const lib = lookupVoicings(chord);
+  const solver = solverCandidates(chord, k);
+
+  if (lib && lib.length) {
+    const dp = lib.map((v) => toCandidate(v, chord));
+    const seen = new Set(dp.map((c) => c.voicing.join(",")));
+    const extra = solver.cands.filter((c) => !seen.has(c.voicing.join(",")));
+    return { dp, alternates: [...dp, ...extra], source: "library" };
+  }
+  return { dp: solver.cands, alternates: solver.cands, source: "solver", ...(solver.warning ? { warning: solver.warning } : {}) };
 }
 
 export interface SolveOptions {
@@ -117,17 +150,18 @@ export function solve(piece: ParsedPiece, opts: SolveOptions = {}): SolveResult 
       }
       chordCache.set(token, chord);
     }
-    nodes.push({ token, chord, voicing: null, info: null, alternates: [], eventIndices: [i] });
+    nodes.push({ token, chord, voicing: null, info: null, alternates: [], source: "solver", eventIndices: [i] });
   });
 
-  // Per-node candidate lists.
+  // Per-node candidate lists (library-first, solver fallback).
   const candLists: Candidate[][] = [];
   for (const node of nodes) {
-    const { cands, warning } = candidatesFor(node.chord, k);
-    node.alternates = cands;
+    const { dp, alternates, source, warning } = candidatesFor(node.chord, k);
+    node.alternates = alternates;
+    node.source = source;
     if (warning) warnings.push(`${node.token}: ${warning}`);
-    if (!cands.length) warnings.push(`${node.token}: no playable voicing found`);
-    candLists.push(cands);
+    if (!dp.length) warnings.push(`${node.token}: no playable voicing found`);
+    candLists.push(dp);
   }
 
   // Viterbi DP over nodes that have at least one candidate.

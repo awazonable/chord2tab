@@ -7,7 +7,7 @@ import { renderVoicing } from "./l1/format.js";
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 const EXAMPLES = [
-  "A / A= / A===",
+  "A | A= | A===",
   "AG | A==G | AG==",
   "A=G",
   "_A",
@@ -85,8 +85,8 @@ function render() {
       const v = node.voicing ? renderVoicing(node.voicing) : "(unplayable)";
       for (const ei of node.eventIndices) voicingByEvent.set(ei, v);
     }
-    html += `<h2>L1 — solved voicings (Viterbi, EADGBE)</h2><div class="scroll"><table>
-      <tr><th>bar:offset</th><th>chord</th><th>voicing (lo→hi)</th><th>alternatives</th></tr>`;
+    html += `<h2>L1 — solved voicings (EADGBE)</h2><div class="scroll"><table>
+      <tr><th>bar:offset</th><th>chord</th><th>voicing (lo→hi)</th><th>source</th><th>alternatives</th></tr>`;
     result.nodes.forEach((node) => {
       const firstEi = node.eventIndices[0]!;
       const ev = events[firstEi]!;
@@ -94,9 +94,14 @@ function render() {
         .slice(1, 4)
         .map((c) => esc(renderVoicing(c.voicing)))
         .join("  ");
+      const src =
+        node.source === "library"
+          ? `<span style="color:var(--accent)">library</span>`
+          : `<span style="opacity:.6">solver</span>`;
       html += `<tr><td>${ev.bar}:${esc(ev.offset.toString())}</td>
         <td>${esc(node.token)}</td>
         <td class="pc">${esc(voicingByEvent.get(firstEi) ?? "")}</td>
+        <td>${src}</td>
         <td style="opacity:.7">${alts}</td></tr>`;
     });
     html += `</table></div>`;

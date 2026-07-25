@@ -8,7 +8,9 @@ Implemented so far:
 - **L0.5** — chord internal representation via left-to-right modifier operators (SPEC §3)
 - **L1** — guitar voicing solver: candidate enumeration with physical filters,
   single/transition costs, and a Viterbi DP over the progression with k-best
-  alternatives (SPEC §4)
+  alternatives (SPEC §4), fronted by a curated **voicing library** of idiomatic
+  open + movable CAGED shapes that override the solver when a standard shape
+  exists (`src/l1/library.ts`)
 
 Tab rendering (L2) and Karplus-Strong audio (§6) are not implemented yet.
 
@@ -41,6 +43,11 @@ npm run cli -- --alts "Cmaj7 | Am7"           # also show k-best voicings
 - **Chords are operators, not a dictionary** (`src/l0_5/chord.ts`). Each modifier
   mutates degree *slots* left-to-right, so `dim` is a relative operator, `6` and
   `7` share a slot, and `add9`/`add2` differ only by octave placement (§3.2).
+- **Idiomatic shapes come first** (`src/l1/library.ts`). Real guitar vocabulary
+  (open chords + movable E-shape/A-shape barres) is looked up by a root-relative
+  interval signature and used as the primary voicing; the solver fills in any
+  chord the library doesn't cover, and always handles slash chords so the `/X`
+  bass is honored. The solver's k-best is still shown as alternatives.
 - **Voicing is a shortest-path search** (`src/l1/`). Physical filters (fret span
   ≤ 4, ≤ 4 fingers after barre merge, inner-mute limit, required-tone coverage,
   slash-bass, string count) prune ~thousands of candidates per chord; a single
@@ -84,8 +91,9 @@ choices made (all documented at their source in the code):
 src/fraction.ts      exact rational type
 src/l0/parse.ts      L0: normalize → tokenize → rational time
 src/l0_5/chord.ts    L0.5: chord slots + modifier operators
+src/l1/library.ts    L1: curated idiomatic shapes (open + movable CAGED barres)
 src/l1/voicing.ts    L1: note selection, candidate enumeration, filters, single cost
-src/l1/solver.ts     L1: transition cost + Viterbi DP + k-best
+src/l1/solver.ts     L1: library-first lookup + transition cost + Viterbi DP + k-best
 src/l1/format.ts     L1: §4.7 text form
 src/cli.ts           terminal inspector
 src/demo.ts          GitHub Pages explorer

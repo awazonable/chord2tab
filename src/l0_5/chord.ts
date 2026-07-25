@@ -287,6 +287,13 @@ export function parseChord(token: string): Chord {
       i = close >= 0 ? close + 1 : body.length;
       continue;
     }
+    // Bare altered tension without parentheses, e.g. `m7b5`, `7b9`, `7#9`, `7#11`.
+    const bareAlt = /^([#b])(\d{1,2})/.exec(body.slice(i));
+    if (bareAlt) {
+      setSlot(tensionDegree(Number(bareAlt[2])), bareAlt[1] === "#" ? 1 : -1)(chord);
+      i += bareAlt[0].length;
+      continue;
+    }
     const slice = body.slice(i);
     let matched = false;
     for (const rule of RULES) {
