@@ -72,6 +72,10 @@
       .controls button { font-size: 14px; padding: 0.35rem 0.9rem; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
       .controls button#stop { background: var(--card); color: var(--fg); border-color: var(--border); }
       .controls label { color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+      .alt { display: inline-block; font-family: var(--mono); font-size: 12px; padding: 0.1rem 0.4rem; margin: 0.1rem; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--fg); }
+      .alt:hover { border-color: var(--accent); color: var(--accent); }
+      .alt.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+      .alt.reset { border-style: dashed; opacity: 0.8; }
       footer { margin-top: 3rem; color: var(--muted); font-size: 13px; }
       a { color: var(--accent); }
       code { font-family: var(--mono); background: var(--card); padding: 0 0.25rem; border-radius: 4px; }
