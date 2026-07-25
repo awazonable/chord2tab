@@ -52,4 +52,5 @@ export {
   mtof,
   type PlayEvent,
   type PlayOptions,
+  type PlaybackOptions,
 } from "./audio/synth.js";

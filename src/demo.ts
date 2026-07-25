@@ -5,7 +5,7 @@ import { solve } from "./l1/solver.js";
 import { renderVoicing } from "./l1/format.js";
 import { buildTab, renderTab } from "./l2/tab.js";
 import { PATTERNS } from "./l2/patterns.js";
-import { GuitarSynth, tabToPlayEvents } from "./audio/synth.js";
+import { GuitarSynth, tabToPlayEvents, tabDurationSec } from "./audio/synth.js";
 
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -153,6 +153,7 @@ const playBtn = document.getElementById("play") as HTMLButtonElement;
 const stopBtn = document.getElementById("stop") as HTMLButtonElement;
 const tempoEl = document.getElementById("tempo") as HTMLInputElement;
 const tempoVal = document.getElementById("tempoVal") as HTMLSpanElement;
+const loopEl = document.getElementById("loop") as HTMLInputElement;
 
 tempoEl.addEventListener("input", () => {
   tempoVal.textContent = tempoEl.value;
@@ -161,8 +162,9 @@ tempoEl.addEventListener("input", () => {
 playBtn.addEventListener("click", async () => {
   try {
     const tab = buildTab(solve(parse(input.value)), { pattern: currentPattern });
-    const events = tabToPlayEvents(tab, { tempo: Number(tempoEl.value) });
-    await synth.play(events);
+    const tempo = Number(tempoEl.value);
+    const events = tabToPlayEvents(tab, { tempo });
+    await synth.play(events, { loop: loopEl.checked, period: tabDurationSec(tab, { tempo }) });
     (window as unknown as { __diag?: string }).__diag = `played:${events.length}`;
   } catch (e) {
     // parse/solve errors are already shown in the output panel; audio/worklet

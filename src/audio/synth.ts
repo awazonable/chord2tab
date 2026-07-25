@@ -59,10 +59,16 @@ export function tabDurationSec(tab: TabResult, opts: PlayOptions = {}): number {
   return tab.totalCols * secPerCol;
 }
 
+export interface PlaybackOptions {
+  loop?: boolean;
+  period?: number; // seconds per loop iteration (typically tabDurationSec)
+}
+
 export class GuitarSynth {
   private ctx: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
   private timers: ReturnType<typeof setTimeout>[] = [];
+  private loopTimer: ReturnType<typeof setTimeout> | null = null;
 
   private async init(): Promise<void> {
     if (this.ctx) return;
@@ -76,11 +82,7 @@ export class GuitarSynth {
     this.node = node;
   }
 
-  /** Schedule and play the events. Resolves immediately after scheduling. */
-  async play(events: PlayEvent[]): Promise<void> {
-    await this.init();
-    await this.ctx!.resume();
-    this.stop();
+  private scheduleOnce(events: PlayEvent[]): void {
     for (const e of events) {
       const id = setTimeout(() => {
         this.node!.port.postMessage(
@@ -93,7 +95,26 @@ export class GuitarSynth {
     }
   }
 
+  /** Schedule and play the events. With opts.loop, repeats every opts.period s. */
+  async play(events: PlayEvent[], opts: PlaybackOptions = {}): Promise<void> {
+    await this.init();
+    await this.ctx!.resume();
+    this.stop();
+    this.scheduleOnce(events);
+    if (opts.loop && opts.period && opts.period > 0) {
+      const tick = () => {
+        this.scheduleOnce(events);
+        this.loopTimer = setTimeout(tick, opts.period! * 1000);
+      };
+      this.loopTimer = setTimeout(tick, opts.period * 1000);
+    }
+  }
+
   stop(): void {
+    if (this.loopTimer !== null) {
+      clearTimeout(this.loopTimer);
+      this.loopTimer = null;
+    }
     for (const id of this.timers) clearTimeout(id);
     this.timers = [];
     this.node?.port.postMessage({ type: "dampAll" });
