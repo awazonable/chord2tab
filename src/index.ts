@@ -43,3 +43,12 @@ export {
   type PluckEvent,
   type DampEvent,
 } from "./l2/tab.js";
+export {
+  GuitarSynth,
+  tabToPlayEvents,
+  tabDurationSec,
+  strumEvents,
+  mtof,
+  type PlayEvent,
+  type PlayOptions,
+} from "./audio/synth.js";

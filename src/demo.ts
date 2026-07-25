@@ -5,6 +5,7 @@ import { solve } from "./l1/solver.js";
 import { renderVoicing } from "./l1/format.js";
 import { buildTab, renderTab } from "./l2/tab.js";
 import { PATTERNS } from "./l2/patterns.js";
+import { GuitarSynth, tabToPlayEvents } from "./audio/synth.js";
 
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -145,6 +146,33 @@ output.addEventListener("change", (e) => {
     render();
   }
 });
+
+// --- audio playback (§6) ---
+const synth = new GuitarSynth();
+const playBtn = document.getElementById("play") as HTMLButtonElement;
+const stopBtn = document.getElementById("stop") as HTMLButtonElement;
+const tempoEl = document.getElementById("tempo") as HTMLInputElement;
+const tempoVal = document.getElementById("tempoVal") as HTMLSpanElement;
+
+tempoEl.addEventListener("input", () => {
+  tempoVal.textContent = tempoEl.value;
+});
+
+playBtn.addEventListener("click", async () => {
+  try {
+    const tab = buildTab(solve(parse(input.value)), { pattern: currentPattern });
+    const events = tabToPlayEvents(tab, { tempo: Number(tempoEl.value) });
+    await synth.play(events);
+    (window as unknown as { __diag?: string }).__diag = `played:${events.length}`;
+  } catch (e) {
+    // parse/solve errors are already shown in the output panel; audio/worklet
+    // failures are surfaced here so they aren't silently swallowed.
+    (window as unknown as { __diag?: string }).__diag = `error:${(e as Error).message}`;
+    console.error("play failed:", e);
+  }
+});
+
+stopBtn.addEventListener("click", () => synth.stop());
 
 input.addEventListener("input", render);
 render();

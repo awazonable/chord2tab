@@ -15,8 +15,10 @@ Implemented so far:
 - **L2** — tab rendering: an independent role-based fingerpicking pattern track
   scanned over the L1 voicing track, with grid-collision quantization, rest /
   string-transition damps, and ASCII tab output (SPEC §5)
+- **§6 audio** — Karplus-Strong string synthesis: six independent voices in an
+  AudioWorklet, driven by the L2 tab. Press **Play** in the live demo.
 
-Karplus-Strong audio (§6) is not implemented yet.
+All five SPEC layers (L0 → audio) are implemented.
 
 ## Live demo
 
@@ -103,6 +105,8 @@ src/l1/solver.ts     L1: library-first lookup + transition cost + Viterbi DP + k
 src/l1/format.ts     L1: §4.7 text form
 src/l2/patterns.ts   L2: role-based fingerpicking patterns (travis, arp, block)
 src/l2/tab.ts        L2: pattern×voicing expander + quantization/damps + ASCII tab
+src/audio/ks-worklet.ts  §6: Karplus-Strong AudioWorklet (6 voices), as a string
+src/audio/synth.ts       §6: tab→events (pure) + GuitarSynth (browser playback)
 src/cli.ts           terminal inspector
 src/demo.ts          GitHub Pages explorer
 tests/               SPEC §2.5 / §3.4 tables + L1/L2 invariants

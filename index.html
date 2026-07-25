@@ -68,6 +68,10 @@
       .pc { color: var(--accent); }
       pre.tab { font-family: var(--mono); font-size: 13px; line-height: 1.4; margin: 0; padding: 0.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
       select { font-family: var(--mono); font-size: 14px; padding: 0.15rem 0.4rem; background: var(--card); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; }
+      .controls { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; font-size: 14px; }
+      .controls button { font-size: 14px; padding: 0.35rem 0.9rem; border: 1px solid var(--accent); border-radius: 6px; background: var(--accent); color: #fff; cursor: pointer; }
+      .controls button#stop { background: var(--card); color: var(--fg); border-color: var(--border); }
+      .controls label { color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
       footer { margin-top: 3rem; color: var(--muted); font-size: 13px; }
       a { color: var(--accent); }
       code { font-family: var(--mono); background: var(--card); padding: 0 0.25rem; border-radius: 4px; }
@@ -79,12 +83,18 @@
       <p class="sub">
         rechord-compatible chord text → rational time model (L0), chord slot
         analysis (L0.5), a voicing solver + idiomatic library (L1), and ASCII
-        tab from fingerpicking patterns (L2). From <code>SPEC.md</code>; audio
-        (Karplus-Strong) comes later.
+        tab from fingerpicking patterns (L2), and Karplus-Strong audio (§6) —
+        press Play. From <code>SPEC.md</code>.
       </p>
 
       <textarea id="input" spellcheck="false">Am F C G | Dm7(b5) Csus2dim | Fm/Ab | % | A==G</textarea>
       <div class="examples" id="examples"></div>
+
+      <div class="controls">
+        <button id="play">▶ Play</button>
+        <button id="stop">■ Stop</button>
+        <label>tempo <input id="tempo" type="range" min="50" max="180" value="100" /> <span id="tempoVal">100</span> BPM</label>
+      </div>
 
       <div id="output"></div>
 
