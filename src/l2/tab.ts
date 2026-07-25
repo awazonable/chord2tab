@@ -16,7 +16,7 @@ import type { TimedEvent } from "../l0/parse.js";
 import type { SolveResult } from "../l1/solver.js";
 import type { Voicing } from "../l1/voicing.js";
 import { OPEN_MIDI } from "../l1/voicing.js";
-import { PATTERNS, resolveRole, type Pattern } from "./patterns.js";
+import { PATTERNS, resolveRole, arpFourStrings, type Pattern } from "./patterns.js";
 
 // --- integer rounding on exact fractions (times are always ≥ 0) ---
 const roundHalfDown = (f: Fraction): number => Number((2n * f.num + f.den - 1n) / (2n * f.den));
@@ -106,6 +106,9 @@ export function buildTab(solve: SolveResult, opts: TabOptions = {}): TabResult {
     return seg;
   };
 
+  // Columns where a chord change lands (for chordStrike patterns).
+  const changeCols = new Set(segments.filter((s) => s.kind === "chord").map((s) => s.gridCol));
+
   // --- plucks ---
   const plucks: PluckEvent[] = [];
   let bstar = 0;
@@ -113,6 +116,14 @@ export function buildTab(solve: SolveResult, opts: TabOptions = {}): TabResult {
   for (let k = 0; k < totalCols; k++) {
     const seg = activeAt(k);
     if (!seg || seg.kind !== "chord" || !seg.voicing) continue;
+
+    // chordStrike: on a bar start or a chord change, strike all four arpeggio
+    // notes together instead of the single arpeggio note (§ user request).
+    if (pattern.chordStrike && (k % colsPerBar === 0 || changeCols.has(k))) {
+      for (const s of arpFourStrings(seg.sounding)) plucks.push({ col: k, stringIdx: s, fret: seg.voicing[s]! });
+      continue;
+    }
+
     const role = pattern.steps[k % pattern.steps.length]!;
     if (role === "-") continue;
 
@@ -171,6 +182,7 @@ export function renderTab(tab: TabResult): string {
   for (const p of tab.plucks) grid[p.stringIdx]![p.col] = p.fret; // pluck wins over damp
 
   const lines: string[] = [
+    `@meter ${tab.pattern.meter ?? "4/4"}`,
     `@tuning EADGBE`,
     `@pattern ${tab.pattern.name} div=${tab.pattern.div}`,
     `@section bars=1-${Math.ceil(tab.totalCols / tab.colsPerBar)} div=${tab.pattern.div}`,

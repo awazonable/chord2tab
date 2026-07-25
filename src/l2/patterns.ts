@@ -21,6 +21,10 @@ export interface Pattern {
   name: string;
   div: Fraction; // spacing between grid slots, in bar units
   steps: Role[];
+  /** Strike all four arpeggio notes together at bar starts and chord changes. */
+  chordStrike?: boolean;
+  /** Meter hint for display only. */
+  meter?: string;
 }
 
 export const PATTERNS: Record<string, Pattern> = {
@@ -44,7 +48,35 @@ export const PATTERNS: Record<string, Pattern> = {
     div: frac(1, 4),
     steps: ["B", "-", "-", "-"], // one bass hit; other voices struck with it (see tab.ts)
   },
+  // 12/8 up-down arpeggio over four selected notes (4 = root = B): 4 3 2 1 2 3
+  // repeated twice per bar -> 432123432123.
+  "arp12": {
+    name: "arp12",
+    div: frac(1, 12),
+    steps: ["B", "m1", "m2", "T", "m2", "m1"],
+    meter: "12/8",
+  },
+  // Same, but strike all four notes together on the downbeat and at each chord
+  // change: (4321)32123... .
+  "arp12-strike": {
+    name: "arp12-strike",
+    div: frac(1, 12),
+    steps: ["B", "m1", "m2", "T", "m2", "m1"],
+    chordStrike: true,
+    meter: "12/8",
+  },
 };
+
+/** The four arpeggio notes (root + three) for a voicing, as string indices. */
+export function arpFourStrings(sounding: number[]): number[] {
+  const roles: Role[] = ["B", "m1", "m2", "T"];
+  const out: number[] = [];
+  for (const r of roles) {
+    const s = resolveRole(r, sounding, 0);
+    if (s !== null && !out.includes(s)) out.push(s);
+  }
+  return out.sort((a, b) => a - b);
+}
 
 /**
  * Resolve a role to a string index (0 = low E … 5 = high e) given the sounding

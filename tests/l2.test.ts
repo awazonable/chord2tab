@@ -3,7 +3,14 @@ import { parse } from "../src/l0/parse.js";
 import { solve } from "../src/l1/solver.js";
 import { OPEN_MIDI } from "../src/l1/voicing.js";
 import { buildTab, renderTab } from "../src/l2/tab.js";
-import { resolveRole } from "../src/l2/patterns.js";
+import { resolveRole, arpFourStrings } from "../src/l2/patterns.js";
+
+/** plucks grouped by column: col -> sorted string indices struck there. */
+function byCol(tab: ReturnType<typeof buildTab>) {
+  const m = new Map<number, number[]>();
+  for (const p of tab.plucks) m.set(p.col, [...(m.get(p.col) ?? []), p.stringIdx].sort((a, b) => a - b));
+  return m;
+}
 
 describe("L2 — role resolution (§5.2)", () => {
   const sounding = [1, 2, 3, 4, 5]; // e.g. an x-shaped 5-string voicing
@@ -86,6 +93,44 @@ describe("L2 — tab generation (§5)", () => {
     const tab = buildTab(res, { pattern: "block" });
     const col0 = tab.plucks.filter((p) => p.col === 0);
     expect(col0.length).toBe(res.nodes[0]!.info!.sounding.length);
+  });
+
+  it("arp12: 12/8 up-down over four notes = 4 3 2 1 2 3 4 3 2 1 2 3", () => {
+    const res = solve(parse("Am"));
+    const tab = buildTab(res, { pattern: "arp12" });
+    expect(tab.colsPerBar).toBe(12);
+    const sounding = res.nodes[0]!.info!.sounding;
+    const roleSeq = ["B", "m1", "m2", "T", "m2", "m1"] as const;
+    // one note per column, following the repeated 6-step role cycle
+    const cols = byCol(tab);
+    for (let k = 0; k < 12; k++) {
+      const expected = resolveRole(roleSeq[k % 6]!, sounding, 0)!;
+      expect(cols.get(k)).toEqual([expected]);
+    }
+  });
+
+  it("arp12-strike: bar start strikes all four notes, then arpeggiates", () => {
+    const res = solve(parse("Am"));
+    const tab = buildTab(res, { pattern: "arp12-strike" });
+    const four = arpFourStrings(res.nodes[0]!.info!.sounding);
+    const cols = byCol(tab);
+    expect(cols.get(0)).toEqual(four); // (4321)
+    expect(four.length).toBe(4);
+    // interior columns are single arpeggio notes
+    expect(cols.get(1)!.length).toBe(1);
+    expect(cols.get(3)!.length).toBe(1);
+  });
+
+  it("arp12-strike: also strikes at a chord change on beat 7 (col 6)", () => {
+    // "Am C" -> two chords, change quantized to col 6 of 12.
+    const res = solve(parse("Am C"));
+    const tab = buildTab(res, { pattern: "arp12-strike" });
+    const cols = byCol(tab);
+    const amFour = arpFourStrings(res.nodes[0]!.info!.sounding);
+    const cFour = arpFourStrings(res.nodes[1]!.info!.sounding);
+    expect(cols.get(0)).toEqual(amFour); // (4321) for Am at bar start
+    expect(cols.get(6)).toEqual(cFour); // (4321) for C at the change
+    expect(cols.get(6)!.length).toBe(4);
   });
 
   it("pluck pitches equal open-string MIDI + fret", () => {
