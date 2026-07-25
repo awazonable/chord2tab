@@ -200,8 +200,10 @@ export const W = {
   barreBonus: -0.25,
   openBonus: -0.5, // open strings pull the solver toward idiomatic open shapes
   height: 0.55, // applied to the *highest* pressed fret (position up the neck)
-  rootBassBonus: -1.8,
-  innerMute: 1.0, // muted string sandwiched between ringing strings (§4.3 慣習形)
+  rootBassBonus: -1.0, // root on the lowest string (no slash) — root position
+  inversionPenalty: 1.8, // a non-root in the bass when no /X was asked for
+  soundingBonus: -0.25, // per ringing string: prefer fuller, idiomatic shapes
+  innerMute: 1.5, // muted string sandwiched between ringing strings (§4.3 慣習形)
   semitoneAdj: 0.9,
   semitoneAdjRelaxed: 0.25, // §4.4 add2/4/6
   omitOptional: 0.5, // per omitted optional tone, scaled by priority
@@ -215,7 +217,13 @@ export function singleCost(v: Voicing, info: VoicingInfo, sel: NoteSelection): n
   cost += W.openBonus * info.openCount;
   cost += W.height * info.maxFret; // higher up the neck = costlier
   cost += W.innerMute * info.innerMutes;
-  if (((info.lowMidi % 12) + 12) % 12 === sel.rootPc) cost += W.rootBassBonus;
+  cost += W.soundingBonus * info.sounding.length;
+  // Root position vs inversion. A /X slash is already forced by the filter, so
+  // only shape plain chords here: reward root-in-bass, penalise inversions.
+  if (sel.bassPc === null) {
+    const lowPc = ((info.lowMidi % 12) + 12) % 12;
+    cost += lowPc === sel.rootPc ? W.rootBassBonus : W.inversionPenalty;
+  }
 
   // Upper-voice semitone adjacency penalty, relaxed for drop_octave (§4.4).
   const adjW = sel.dropOctave ? W.semitoneAdjRelaxed : W.semitoneAdj;
