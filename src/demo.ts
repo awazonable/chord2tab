@@ -1,11 +1,32 @@
 /** Interactive L0/L0.5/L1 explorer for GitHub Pages. */
 import { parse, ParseError } from "./l0/parse.js";
 import { parseChord, pitchClasses, DEGREES, type Chord } from "./l0_5/chord.js";
-import { solve } from "./l1/solver.js";
+import { solve, type SolveResult } from "./l1/solver.js";
 import { renderVoicing } from "./l1/format.js";
+import { analyze, type Voicing } from "./l1/voicing.js";
 import { buildTab, renderTab } from "./l2/tab.js";
 import { PATTERNS } from "./l2/patterns.js";
 import { GuitarSynth, tabToPlayEvents, tabDurationSec } from "./audio/synth.js";
+
+/** User-chosen voicing overrides, keyed by chord token (applies to every use). */
+const overrides = new Map<string, Voicing>();
+
+function parseVoicing(s: string): Voicing {
+  return s.split("-").map((t) => (t === "x" ? null : Number(t)));
+}
+
+/** Solve, then replace any chord's voicing with the user's chosen alternative. */
+function solveWithOverrides(text: string): SolveResult {
+  const res = solve(parse(text));
+  for (const node of res.nodes) {
+    const ov = overrides.get(node.token);
+    if (ov) {
+      node.voicing = ov;
+      node.info = analyze(ov);
+    }
+  }
+  return res;
+}
 
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -83,31 +104,42 @@ function render() {
       html += `</table></div>`;
     }
 
-    // ---- L1: solved voicings ----
-    const result = solve({ events, bars: [] });
+    // ---- L1: solved voicings (with user-selectable alternatives) ----
+    const result = solveWithOverrides(text);
     const voicingByEvent = new Map<number, string>();
     for (const node of result.nodes) {
       const v = node.voicing ? renderVoicing(node.voicing) : "(unplayable)";
       for (const ei of node.eventIndices) voicingByEvent.set(ei, v);
     }
-    html += `<h2>L1 — solved voicings (EADGBE)</h2><div class="scroll"><table>
-      <tr><th>bar:offset</th><th>chord</th><th>voicing (lo→hi)</th><th>source</th><th>alternatives</th></tr>`;
+    html += `<h2>L1 — solved voicings (EADGBE)</h2>
+      <p style="color:var(--muted);font-size:13px;margin:.25rem 0 .75rem">Click an alternative to pin that voicing for the chord.</p>
+      <div class="scroll"><table>
+      <tr><th>bar:offset</th><th>chord</th><th>voicing (lo→hi)</th><th>source</th><th>alternatives (click to use)</th></tr>`;
     result.nodes.forEach((node) => {
       const firstEi = node.eventIndices[0]!;
       const ev = events[firstEi]!;
-      const alts = node.alternates
-        .slice(1, 4)
-        .map((c) => esc(renderVoicing(c.voicing)))
-        .join("  ");
-      const src =
-        node.source === "library"
+      const current = node.voicing ? renderVoicing(node.voicing) : "";
+      const chips = node.alternates
+        .slice(0, 6)
+        .map((c) => {
+          const vs = renderVoicing(c.voicing);
+          const active = vs === current ? " active" : "";
+          return `<span class="alt${active}" data-token="${esc(node.token)}" data-v="${vs}">${vs}</span>`;
+        })
+        .join(" ");
+      const reset = overrides.has(node.token)
+        ? ` <span class="alt reset" data-token="${esc(node.token)}" data-v="auto">auto ✕</span>`
+        : "";
+      const src = overrides.has(node.token)
+        ? `<span style="color:var(--accent)">pinned</span>`
+        : node.source === "library"
           ? `<span style="color:var(--accent)">library</span>`
           : `<span style="opacity:.6">solver</span>`;
       html += `<tr><td>${ev.bar}:${esc(ev.offset.toString())}</td>
         <td>${esc(node.token)}</td>
-        <td class="pc">${esc(voicingByEvent.get(firstEi) ?? "")}</td>
+        <td class="pc">${esc(current || "(unplayable)")}</td>
         <td>${src}</td>
-        <td style="opacity:.7">${alts}</td></tr>`;
+        <td>${chips}${reset}</td></tr>`;
     });
     html += `</table></div>`;
     if (result.warnings.length) {
@@ -147,6 +179,17 @@ output.addEventListener("change", (e) => {
   }
 });
 
+// Click an alternative voicing to pin it (or "auto ✕" to clear the override).
+output.addEventListener("click", (e) => {
+  const chip = (e.target as HTMLElement).closest(".alt") as HTMLElement | null;
+  if (!chip) return;
+  const token = chip.getAttribute("data-token")!;
+  const v = chip.getAttribute("data-v")!;
+  if (v === "auto") overrides.delete(token);
+  else overrides.set(token, parseVoicing(v));
+  render();
+});
+
 // --- audio playback (§6) ---
 const synth = new GuitarSynth();
 const playBtn = document.getElementById("play") as HTMLButtonElement;
@@ -161,7 +204,7 @@ tempoEl.addEventListener("input", () => {
 
 playBtn.addEventListener("click", async () => {
   try {
-    const tab = buildTab(solve(parse(input.value)), { pattern: currentPattern });
+    const tab = buildTab(solveWithOverrides(input.value), { pattern: currentPattern });
     const tempo = Number(tempoEl.value);
     const events = tabToPlayEvents(tab, { tempo });
     await synth.play(events, { loop: loopEl.checked, period: tabDurationSec(tab, { tempo }) });
