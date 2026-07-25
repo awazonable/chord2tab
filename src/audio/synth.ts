@@ -6,7 +6,7 @@
  * AudioContext and is only exercised in the page.
  */
 import { OPEN_MIDI, type Voicing } from "../l1/voicing.js";
-import type { TabResult } from "../l2/tab.js";
+import type { TabResult, PluckEvent } from "../l2/tab.js";
 import { KS_WORKLET } from "./ks-worklet.js";
 
 export const mtof = (midi: number): number => 440 * Math.pow(2, (midi - 69) / 12);
@@ -23,25 +23,40 @@ export interface PlayEvent {
 export interface PlayOptions {
   tempo?: number; // BPM
   beatsPerBar?: number; // meter numerator
+  /** Down-strum stagger, seconds between adjacent strings when a column strikes
+   * several notes at once. 0 = perfectly simultaneous. */
+  strum?: number;
 }
 
 /** Turn an L2 tab into time-stamped audio events. Pure. */
 export function tabToPlayEvents(tab: TabResult, opts: PlayOptions = {}): PlayEvent[] {
   const tempo = opts.tempo ?? 100;
   const beatsPerBar = opts.beatsPerBar ?? 4;
+  const strum = opts.strum ?? 0.018;
   const secPerBar = (beatsPerBar * 60) / tempo;
   const secPerCol = tab.pattern.div.toNumber() * secPerBar;
 
-  const events: PlayEvent[] = [];
+  // Group plucks by column so a multi-note strike can be rolled as a downstroke.
+  const byCol = new Map<number, PluckEvent[]>();
   for (const p of tab.plucks) {
-    events.push({
-      time: p.col * secPerCol,
-      type: "pluck",
-      string: p.stringIdx,
-      freq: mtof(OPEN_MIDI[p.stringIdx]! + p.fret),
-      vel: 0.85,
-      // higher strings a touch brighter
-      bright: 0.4 + (p.stringIdx / 5) * 0.35,
+    const arr = byCol.get(p.col) ?? [];
+    arr.push(p);
+    byCol.set(p.col, arr);
+  }
+
+  const events: PlayEvent[] = [];
+  for (const [col, group] of byCol) {
+    // downstroke: low string (index 0) first, high string last
+    group.sort((a, b) => a.stringIdx - b.stringIdx);
+    group.forEach((p, rank) => {
+      events.push({
+        time: col * secPerCol + rank * strum, // rank 0 = exact; single notes unaffected
+        type: "pluck",
+        string: p.stringIdx,
+        freq: mtof(OPEN_MIDI[p.stringIdx]! + p.fret),
+        vel: 0.85,
+        bright: 0.4 + (p.stringIdx / 5) * 0.35, // higher strings a touch brighter
+      });
     });
   }
   for (const d of tab.damps) {

@@ -40,4 +40,27 @@ describe("audio — tab → play events", () => {
       if (e.type === "pluck") expect(e.freq! > 0 && Number.isFinite(e.freq!)).toBe(true);
     }
   });
+
+  it("strikes roll as a downstroke: low string first, staggered by `strum`", () => {
+    const strikeTab = buildTab(solve(parse("C")), { pattern: "strike" });
+    const strum = 0.02;
+    const ev = tabToPlayEvents(strikeTab, { tempo: 100, strum }).filter((e) => e.type === "pluck");
+    // The downbeat strike is a group of notes at col 0; recover it by base time.
+    const group = ev
+      .filter((e) => e.time < strum * 6) // all within the first strum window
+      .sort((a, b) => a.time - b.time);
+    expect(group.length).toBeGreaterThan(1);
+    for (let i = 1; i < group.length; i++) {
+      expect(group[i]!.string).toBeGreaterThan(group[i - 1]!.string); // ascending = low→high
+      expect(group[i]!.time - group[i - 1]!.time).toBeCloseTo(strum, 9); // even spacing
+    }
+    expect(group[0]!.time).toBe(0); // first note is exactly on the beat
+  });
+
+  it("simultaneous strum can be disabled with strum: 0", () => {
+    const strikeTab = buildTab(solve(parse("C")), { pattern: "strike" });
+    const ev = tabToPlayEvents(strikeTab, { strum: 0 }).filter((e) => e.type === "pluck");
+    const atZero = ev.filter((e) => e.time === 0);
+    expect(atZero.length).toBeGreaterThan(1); // all downbeat notes share the instant
+  });
 });
