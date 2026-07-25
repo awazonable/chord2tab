@@ -103,7 +103,7 @@ src/l1/library.ts    L1: curated idiomatic shapes (open + movable CAGED barres)
 src/l1/voicing.ts    L1: note selection, candidate enumeration, filters, single cost
 src/l1/solver.ts     L1: library-first lookup + transition cost + Viterbi DP + k-best
 src/l1/format.ts     L1: §4.7 text form
-src/l2/patterns.ts   L2: role-based fingerpicking patterns (travis, arp, block)
+src/l2/patterns.ts   L2: role-based patterns (arp12, arp12-strike, strike, arp-up/updown)
 src/l2/tab.ts        L2: pattern×voicing expander + quantization/damps + ASCII tab
 src/audio/ks-worklet.ts  §6: Karplus-Strong AudioWorklet (6 voices), as a string
 src/audio/synth.ts       §6: tab→events (pure) + GuitarSynth (browser playback)

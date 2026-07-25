@@ -25,7 +25,7 @@ const input = document.getElementById("input") as HTMLTextAreaElement;
 const output = document.getElementById("output") as HTMLDivElement;
 const examples = document.getElementById("examples") as HTMLDivElement;
 
-let currentPattern = "travis";
+let currentPattern = "arp12";
 
 function esc(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]!);

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { parse } from "../src/l0/parse.js";
 import { solve } from "../src/l1/solver.js";
 import { OPEN_MIDI } from "../src/l1/voicing.js";
-import { buildTab, renderTab } from "../src/l2/tab.js";
-import { resolveRole, arpFourStrings } from "../src/l2/patterns.js";
+import { parseChord } from "../src/l0_5/chord.js";
+import { buildTab, renderTab, selectArpStrings } from "../src/l2/tab.js";
+import { resolveRole } from "../src/l2/patterns.js";
 
 /** plucks grouped by column: col -> sorted string indices struck there. */
 function byCol(tab: ReturnType<typeof buildTab>) {
@@ -40,10 +41,8 @@ describe("L2 — role resolution (§5.2)", () => {
 describe("L2 — tab generation (§5)", () => {
   it("plays only sounding strings, with frets matching the active voicing", () => {
     const res = solve(parse("C | Am | F | G"));
-    const tab = buildTab(res, { pattern: "travis" });
+    const tab = buildTab(res, { pattern: "arp-up" });
     expect(tab.plucks.length).toBeGreaterThan(0);
-    const bySeg = res.nodes; // one node per bar here
-    void bySeg;
     for (const p of tab.plucks) {
       expect(p.fret).toBeGreaterThanOrEqual(0);
       expect(p.stringIdx).toBeGreaterThanOrEqual(0);
@@ -52,7 +51,7 @@ describe("L2 — tab generation (§5)", () => {
   });
 
   it("the pattern grid spans whole bars (8 columns/bar at div=1/8)", () => {
-    const tab = buildTab(solve(parse("C | Am | F | G")), { pattern: "travis" });
+    const tab = buildTab(solve(parse("C | Am | F | G")), { pattern: "arp-up" });
     expect(tab.colsPerBar).toBe(8);
     expect(tab.totalCols).toBe(32);
   });
@@ -72,7 +71,7 @@ describe("L2 — tab generation (§5)", () => {
 
   it("a rest damps every ringing string (§5.5)", () => {
     const res = solve(parse("C | _"));
-    const tab = buildTab(res, { pattern: "travis" });
+    const tab = buildTab(res, { pattern: "arp12" });
     const cSounding = res.nodes[0]!.info!.sounding;
     // there is a damp at the rest onset covering all of C's strings
     const restDamp = tab.damps.find((d) => d.strings.length === cSounding.length);
@@ -81,41 +80,58 @@ describe("L2 — tab generation (§5)", () => {
   });
 
   it("renders six labelled tab lines, high e on top", () => {
-    const out = renderTab(buildTab(solve(parse("C | G")), { pattern: "travis" }));
+    const out = renderTab(buildTab(solve(parse("C | G")), { pattern: "arp12" }));
     const lines = out.split("\n").filter((l) => /^[eBGDAE]\|/.test(l));
     expect(lines.length).toBe(6);
     expect(lines[0]!.startsWith("e|")).toBe(true);
     expect(lines[5]!.startsWith("E|")).toBe(true);
   });
 
-  it("block pattern strikes all sounding strings together on the beat", () => {
-    const res = solve(parse("C"));
-    const tab = buildTab(res, { pattern: "block" });
-    const col0 = tab.plucks.filter((p) => p.col === 0);
-    expect(col0.length).toBe(res.nodes[0]!.info!.sounding.length);
+  it("strike pattern hits all four notes at bar start and chord change only", () => {
+    const res = solve(parse("Am C"));
+    const tab = buildTab(res, { pattern: "strike" });
+    const cols = byCol(tab);
+    const amFour = selectArpStrings(res.nodes[0]!.chord, res.nodes[0]!.voicing!);
+    expect(cols.get(0)).toEqual(amFour); // downbeat strike
+    expect(cols.get(6)!.length).toBe(4); // chord change on beat 7
+    // nothing struck in between (rings out)
+    expect(cols.get(1)).toBeUndefined();
+    expect(cols.get(3)).toBeUndefined();
   });
 
-  it("arp12: 12/8 up-down over four notes = 4 3 2 1 2 3 4 3 2 1 2 3", () => {
+  it("arp12: 12/8 up-down over the four selected notes = 4 3 2 1 2 3 ×2", () => {
     const res = solve(parse("Am"));
     const tab = buildTab(res, { pattern: "arp12" });
     expect(tab.colsPerBar).toBe(12);
-    const sounding = res.nodes[0]!.info!.sounding;
+    const four = selectArpStrings(res.nodes[0]!.chord, res.nodes[0]!.voicing!);
     const roleSeq = ["B", "m1", "m2", "T", "m2", "m1"] as const;
-    // one note per column, following the repeated 6-step role cycle
     const cols = byCol(tab);
     for (let k = 0; k < 12; k++) {
-      const expected = resolveRole(roleSeq[k % 6]!, sounding, 0)!;
+      const expected = resolveRole(roleSeq[k % 6]!, four, 0)!;
       expect(cols.get(k)).toEqual([expected]);
     }
+  });
+
+  it("selects four notes by CHORD TONE: Esus4 and E arpeggiate differently", () => {
+    // The bug: role-by-string dropped the G string (3rd vs 4th), so both were
+    // identical. Chord-tone selection must keep that characteristic note.
+    const eFour = selectArpStrings(parseChord("E"), solve(parse("E")).nodes[0]!.voicing!);
+    const susFour = selectArpStrings(parseChord("Esus4"), solve(parse("Esus4")).nodes[0]!.voicing!);
+    const pcs = (chordTok: string, four: number[]) => {
+      const v = solve(parse(chordTok)).nodes[0]!.voicing!;
+      return new Set(four.map((s) => (OPEN_MIDI[s]! + v[s]!) % 12));
+    };
+    expect(pcs("E", eFour)).not.toEqual(pcs("Esus4", susFour));
+    expect(pcs("E", eFour).has(8)).toBe(true); // G# (major 3rd)
+    expect(pcs("Esus4", susFour).has(9)).toBe(true); // A (4th)
   });
 
   it("arp12-strike: bar start strikes all four notes, then arpeggiates", () => {
     const res = solve(parse("Am"));
     const tab = buildTab(res, { pattern: "arp12-strike" });
-    const four = arpFourStrings(res.nodes[0]!.info!.sounding);
+    const four = selectArpStrings(res.nodes[0]!.chord, res.nodes[0]!.voicing!);
     const cols = byCol(tab);
     expect(cols.get(0)).toEqual(four); // (4321)
-    expect(four.length).toBe(4);
     // interior columns are single arpeggio notes
     expect(cols.get(1)!.length).toBe(1);
     expect(cols.get(3)!.length).toBe(1);
@@ -126,8 +142,8 @@ describe("L2 — tab generation (§5)", () => {
     const res = solve(parse("Am C"));
     const tab = buildTab(res, { pattern: "arp12-strike" });
     const cols = byCol(tab);
-    const amFour = arpFourStrings(res.nodes[0]!.info!.sounding);
-    const cFour = arpFourStrings(res.nodes[1]!.info!.sounding);
+    const amFour = selectArpStrings(res.nodes[0]!.chord, res.nodes[0]!.voicing!);
+    const cFour = selectArpStrings(res.nodes[1]!.chord, res.nodes[1]!.voicing!);
     expect(cols.get(0)).toEqual(amFour); // (4321) for Am at bar start
     expect(cols.get(6)).toEqual(cFour); // (4321) for C at the change
     expect(cols.get(6)!.length).toBe(4);

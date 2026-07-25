@@ -35,7 +35,7 @@ async function main() {
   const args = process.argv.slice(2);
   const showAlts = args.includes("--alts");
   const pIdx = args.indexOf("--pattern");
-  const patternName = pIdx >= 0 ? args[pIdx + 1] : "travis";
+  const patternName = pIdx >= 0 ? args[pIdx + 1] : "arp12";
   const rest = args.filter((a, i) => a !== "--alts" && a !== "--pattern" && i !== pIdx + 1);
   const input = (rest.join(" ").trim() || (await readStdin()).trim());
   if (!input) {

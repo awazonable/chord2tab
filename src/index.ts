@@ -34,11 +34,12 @@ export {
 export { solve, transitionCost, type SolveResult, type NodeResult } from "./l1/solver.js";
 export { formatL1, renderVoicing } from "./l1/format.js";
 export { lookupVoicings, signatureOf } from "./l1/library.js";
-export { PATTERNS, resolveRole, arpFourStrings, type Pattern, type Role } from "./l2/patterns.js";
+export { PATTERNS, resolveRole, type Pattern, type Role } from "./l2/patterns.js";
 export {
   buildTab,
   renderTab,
   pluckMidi,
+  selectArpStrings,
   type TabResult,
   type PluckEvent,
   type DampEvent,

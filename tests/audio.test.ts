@@ -13,7 +13,7 @@ describe("audio — pitch conversion", () => {
 });
 
 describe("audio — tab → play events", () => {
-  const tab = buildTab(solve(parse("C | Am | F | G")), { pattern: "travis" });
+  const tab = buildTab(solve(parse("C | Am | F | G")), { pattern: "arp-up" });
 
   it("emits a pluck per tab pluck and a damp per damped string", () => {
     const ev = tabToPlayEvents(tab, { tempo: 120 });

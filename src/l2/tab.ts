@@ -15,8 +15,56 @@ import { Fraction, frac } from "../fraction.js";
 import type { TimedEvent } from "../l0/parse.js";
 import type { SolveResult } from "../l1/solver.js";
 import type { Voicing } from "../l1/voicing.js";
-import { OPEN_MIDI } from "../l1/voicing.js";
-import { PATTERNS, resolveRole, arpFourStrings, type Pattern } from "./patterns.js";
+import { OPEN_MIDI, selectNotes } from "../l1/voicing.js";
+import type { Chord } from "../l0_5/chord.js";
+import { PATTERNS, resolveRole, type Pattern } from "./patterns.js";
+
+const pcOf = (v: Voicing, s: number): number => ((OPEN_MIDI[s]! + v[s]!) % 12 + 12) % 12;
+
+/**
+ * Choose the (up to) four notes the arpeggio plays, by CHORD TONE, not just by
+ * string position. Keeps the bass and top strings, and drops octave-duplicate
+ * pitch classes first so a chord's characteristic tone (e.g. the 3rd vs a sus4)
+ * is always represented — otherwise Esus4 and E would arpeggiate identically.
+ * Returns string indices low→high.
+ */
+export function selectArpStrings(chord: Chord, voicing: Voicing): number[] {
+  const s: number[] = [];
+  for (let i = 0; i < 6; i++) if (voicing[i] !== null) s.push(i);
+  if (s.length <= 4) return s;
+
+  const droppable = selectNotes(chord).droppableByPriority; // pcs, earliest = drop first
+  const dropRank = (p: number): number => {
+    const i = droppable.indexOf(p);
+    return i < 0 ? Infinity : i;
+  };
+
+  while (s.length > 4) {
+    // 1) prefer removing an interior string whose pitch class is duplicated
+    let removeAt = -1;
+    for (let i = 1; i < s.length - 1; i++) {
+      const p = pcOf(voicing, s[i]!);
+      if (s.filter((x) => pcOf(voicing, x) === p).length > 1) {
+        removeAt = i;
+        break;
+      }
+    }
+    // 2) otherwise remove the most-droppable interior tone (5th first, etc.)
+    if (removeAt < 0) {
+      let best = Infinity;
+      removeAt = 1;
+      for (let i = 1; i < s.length - 1; i++) {
+        const r = dropRank(pcOf(voicing, s[i]!));
+        if (r < best) {
+          best = r;
+          removeAt = i;
+        }
+      }
+    }
+    s.splice(removeAt, 1);
+  }
+  return s;
+}
 
 // --- integer rounding on exact fractions (times are always ≥ 0) ---
 const roundHalfDown = (f: Fraction): number => Number((2n * f.num + f.den - 1n) / (2n * f.den));
@@ -27,6 +75,7 @@ interface Segment {
   kind: "chord" | "rest" | "nc";
   voicing?: Voicing;
   sounding: number[]; // ascending string indices, [] for rest/nc
+  four: number[]; // chord-tone-aware arpeggio strings, low→high ([] for rest/nc)
 }
 
 export interface PluckEvent {
@@ -53,16 +102,16 @@ export interface TabOptions {
 }
 
 export function buildTab(solve: SolveResult, opts: TabOptions = {}): TabResult {
-  const pattern = PATTERNS[opts.pattern ?? "travis"] ?? PATTERNS.travis!;
+  const pattern = PATTERNS[opts.pattern ?? "arp12"] ?? PATTERNS["arp12"]!;
   const div = pattern.div;
   const warnings: string[] = [...solve.warnings];
 
-  // event index -> voicing / sounding
-  const voicingByEvent = new Map<number, { voicing: Voicing; sounding: number[] }>();
+  // event index -> voicing / sounding / chord
+  const voicingByEvent = new Map<number, { voicing: Voicing; sounding: number[]; chord: Chord }>();
   for (const node of solve.nodes) {
     if (!node.voicing || !node.info) continue;
     for (const ei of node.eventIndices) {
-      voicingByEvent.set(ei, { voicing: node.voicing, sounding: node.info.sounding });
+      voicingByEvent.set(ei, { voicing: node.voicing, sounding: node.info.sounding, chord: node.chord });
     }
   }
 
@@ -85,9 +134,17 @@ export function buildTab(solve: SolveResult, opts: TabOptions = {}): TabResult {
 
     if (ev.kind === "chord") {
       const v = voicingByEvent.get(i);
-      if (v) segments.push({ gridCol, kind: "chord", voicing: v.voicing, sounding: v.sounding });
+      if (v) {
+        segments.push({
+          gridCol,
+          kind: "chord",
+          voicing: v.voicing,
+          sounding: v.sounding,
+          four: selectArpStrings(v.chord, v.voicing),
+        });
+      }
     } else {
-      segments.push({ gridCol, kind: ev.kind, sounding: [] });
+      segments.push({ gridCol, kind: ev.kind, sounding: [], four: [] });
     }
   });
   segments.sort((a, b) => a.gridCol - b.gridCol);
@@ -112,27 +169,22 @@ export function buildTab(solve: SolveResult, opts: TabOptions = {}): TabResult {
   // --- plucks ---
   const plucks: PluckEvent[] = [];
   let bstar = 0;
-  const isBlock = pattern.name === "block";
   for (let k = 0; k < totalCols; k++) {
     const seg = activeAt(k);
     if (!seg || seg.kind !== "chord" || !seg.voicing) continue;
 
-    // chordStrike: on a bar start or a chord change, strike all four arpeggio
+    // chordStrike: on a bar start or a chord change, strike all four selected
     // notes together instead of the single arpeggio note (§ user request).
     if (pattern.chordStrike && (k % colsPerBar === 0 || changeCols.has(k))) {
-      for (const s of arpFourStrings(seg.sounding)) plucks.push({ col: k, stringIdx: s, fret: seg.voicing[s]! });
+      for (const s of seg.four) plucks.push({ col: k, stringIdx: s, fret: seg.voicing[s]! });
       continue;
     }
 
     const role = pattern.steps[k % pattern.steps.length]!;
     if (role === "-") continue;
 
-    if (isBlock && role === "B") {
-      // block: strike every sounding string on the beat
-      for (const s of seg.sounding) plucks.push({ col: k, stringIdx: s, fret: seg.voicing[s]! });
-      continue;
-    }
-    const s = resolveRole(role, seg.sounding, bstar);
+    // Roles resolve against the four chord-tone-aware notes, not raw strings.
+    const s = resolveRole(role, seg.four, bstar);
     if (role === "B*") bstar++;
     if (s === null) continue;
     const fret = seg.voicing[s];
