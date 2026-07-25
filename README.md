@@ -2,21 +2,23 @@
 
 Chord-progression text → guitar arpeggio, per [`SPEC.md`](./SPEC.md).
 
-This repository currently implements the first two, cheapest-to-lock layers
-(SPEC §7 says to make these green before touching the solver):
+Implemented so far:
 
 - **L0** — input notation + rational time model (SPEC §2)
 - **L0.5** — chord internal representation via left-to-right modifier operators (SPEC §3)
+- **L1** — guitar voicing solver: candidate enumeration with physical filters,
+  single/transition costs, and a Viterbi DP over the progression with k-best
+  alternatives (SPEC §4)
 
-The voicing solver (L1), tab rendering (L2), and Karplus-Strong audio (§6) are
-not implemented yet.
+Tab rendering (L2) and Karplus-Strong audio (§6) are not implemented yet.
 
 ## Live demo
 
-An interactive L0/L0.5 explorer is deployed to GitHub Pages. Type a progression
-and see the exact-rational event timeline and the pitch-class analysis of each
-chord. Building it (`npm run build`) also runs the tests, and pushes to `main`
-auto-deploy via `.github/workflows/deploy-pages.yml`.
+An interactive L0/L0.5/L1 explorer is deployed to GitHub Pages. Type a
+progression and see the exact-rational event timeline, the pitch-class analysis
+of each chord, and the solved guitar voicings (with alternatives). Building it
+(`npm run build`) also runs the tests, and pushes to `main` auto-deploy via
+`.github/workflows/deploy-pages.yml`.
 
 > To enable Pages: repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
@@ -28,7 +30,8 @@ npm test          # runs the mandatory SPEC §2.5 and §3.4 test tables
 npm run typecheck
 npm run dev        # local demo at http://localhost:5173
 npm run build      # typecheck + tests + static build into dist/
-npm run cli -- "A==G | Dm7(b5) | Csus2dim"   # inspect L0 + L0.5 from the terminal
+npm run cli -- "C Am F G | Dm7(b5) | Fm/Ab"   # L0 + L0.5 + solved L1 tab
+npm run cli -- --alts "Cmaj7 | Am7"           # also show k-best voicings
 ```
 
 ## Design notes
@@ -38,6 +41,14 @@ npm run cli -- "A==G | Dm7(b5) | Csus2dim"   # inspect L0 + L0.5 from the termin
 - **Chords are operators, not a dictionary** (`src/l0_5/chord.ts`). Each modifier
   mutates degree *slots* left-to-right, so `dim` is a relative operator, `6` and
   `7` share a slot, and `add9`/`add2` differ only by octave placement (§3.2).
+- **Voicing is a shortest-path search** (`src/l1/`). Physical filters (fret span
+  ≤ 4, ≤ 4 fingers after barre merge, inner-mute limit, required-tone coverage,
+  slash-bass, string count) prune ~thousands of candidates per chord; a single
+  cost (§4.3) ranks them and a Viterbi DP with transition cost (§4.5) picks the
+  smoothest path. Cost weights live in `W`/`TW` and are meant to be tuned by ear
+  (§7 calls this the most iterative part) — k-best alternatives are exposed to
+  compare. Note selection follows the §4.1 drop priority (5th → 11th → 9th →
+  root → 13th); `null` slots (e.g. `omit5`) are never sounded.
 
 ## Spec deviations
 
@@ -73,7 +84,10 @@ choices made (all documented at their source in the code):
 src/fraction.ts      exact rational type
 src/l0/parse.ts      L0: normalize → tokenize → rational time
 src/l0_5/chord.ts    L0.5: chord slots + modifier operators
+src/l1/voicing.ts    L1: note selection, candidate enumeration, filters, single cost
+src/l1/solver.ts     L1: transition cost + Viterbi DP + k-best
+src/l1/format.ts     L1: §4.7 text form
 src/cli.ts           terminal inspector
 src/demo.ts          GitHub Pages explorer
-tests/               SPEC §2.5 / §3.4 tables + more
+tests/               SPEC §2.5 / §3.4 tables + L1 playability invariants
 ```

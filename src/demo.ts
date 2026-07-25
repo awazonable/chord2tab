@@ -1,6 +1,8 @@
-/** Interactive L0/L0.5 explorer for GitHub Pages. */
+/** Interactive L0/L0.5/L1 explorer for GitHub Pages. */
 import { parse, ParseError } from "./l0/parse.js";
 import { parseChord, pitchClasses, DEGREES, type Chord } from "./l0_5/chord.js";
+import { solve } from "./l1/solver.js";
+import { renderVoicing } from "./l1/format.js";
 
 const PC_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -74,6 +76,32 @@ function render() {
         }
       }
       html += `</table></div>`;
+    }
+
+    // ---- L1: solved voicings ----
+    const result = solve({ events, bars: [] });
+    const voicingByEvent = new Map<number, string>();
+    for (const node of result.nodes) {
+      const v = node.voicing ? renderVoicing(node.voicing) : "(unplayable)";
+      for (const ei of node.eventIndices) voicingByEvent.set(ei, v);
+    }
+    html += `<h2>L1 — solved voicings (Viterbi, EADGBE)</h2><div class="scroll"><table>
+      <tr><th>bar:offset</th><th>chord</th><th>voicing (lo→hi)</th><th>alternatives</th></tr>`;
+    result.nodes.forEach((node) => {
+      const firstEi = node.eventIndices[0]!;
+      const ev = events[firstEi]!;
+      const alts = node.alternates
+        .slice(1, 4)
+        .map((c) => esc(renderVoicing(c.voicing)))
+        .join("  ");
+      html += `<tr><td>${ev.bar}:${esc(ev.offset.toString())}</td>
+        <td>${esc(node.token)}</td>
+        <td class="pc">${esc(voicingByEvent.get(firstEi) ?? "")}</td>
+        <td style="opacity:.7">${alts}</td></tr>`;
+    });
+    html += `</table></div>`;
+    if (result.warnings.length) {
+      html += `<div class="err">${result.warnings.map(esc).join("\n")}</div>`;
     }
   } catch (e) {
     const label = e instanceof ParseError ? "Parse error" : "Error";

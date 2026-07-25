@@ -19,3 +19,17 @@ export {
   type Slots,
   type Degree,
 } from "./l0_5/chord.js";
+export {
+  selectNotes,
+  enumerate,
+  analyze,
+  singleCost,
+  passesFilters,
+  OPEN_MIDI,
+  type Voicing,
+  type Candidate,
+  type VoicingInfo,
+  type NoteSelection,
+} from "./l1/voicing.js";
+export { solve, transitionCost, type SolveResult, type NodeResult } from "./l1/solver.js";
+export { formatL1, renderVoicing } from "./l1/format.js";

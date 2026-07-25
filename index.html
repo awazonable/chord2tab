@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>chord2tab — L0 / L0.5 explorer</title>
+    <title>chord2tab — L0 / L0.5 / L1 explorer</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -75,9 +75,9 @@
     <div class="wrap">
       <h1>chord2tab</h1>
       <p class="sub">
-        rechord-compatible chord text → rational time model (L0) + guitar chord slot
-        analysis (L0.5). This is the tested foundation from <code>SPEC.md</code>; the
-        voicing solver, tab, and audio come later.
+        rechord-compatible chord text → rational time model (L0), guitar chord slot
+        analysis (L0.5), and a Viterbi voicing solver (L1). From
+        <code>SPEC.md</code>; the tab layer (L2) and audio come later.
       </p>
 
       <textarea id="input" spellcheck="false">Am F C G | Dm7(b5) Csus2dim | Fm/Ab | % | A==G</textarea>
